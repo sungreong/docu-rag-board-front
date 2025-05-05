@@ -16,6 +16,7 @@ function SearchPage() {
   const [selectedTags, setSelectedTags] = useState([]);
   const [availableTags, setAvailableTags] = useState([]);
   const [sortOrder, setSortOrder] = useState('relevant');
+  const [searchType, setSearchType] = useState('keyword'); // 검색 유형: keyword, pattern, similar
 
   // URL에서 검색어 추출
   useEffect(() => {
@@ -23,18 +24,20 @@ function SearchPage() {
     const query = params.get('query') || '';
     const tags = params.getAll('tag') || [];
     const sort = params.get('sort') || 'relevant';
+    const type = params.get('type') || 'keyword';
     
     setSearchQuery(query);
     setSelectedTags(tags);
     setSortOrder(sort);
+    setSearchType(type);
     
     if (query) {
-      performSearch(query, tags, sort);
+      performSearch(query, tags, sort, type);
     }
   }, [location.search]);
 
   // 검색 실행 함수
-  const performSearch = async (query, tags = [], sort = 'relevant') => {
+  const performSearch = async (query, tags = [], sort = 'relevant', type = 'keyword') => {
     if (!query.trim()) return;
     
     setIsLoading(true);
@@ -43,14 +46,28 @@ function SearchPage() {
     try {
       const filters = {
         tags: tags,
-        sort_by: sort
+        sort_by: sort,
+        search_type: type
       };
       
       const response = await searchApi.searchDocuments(query, filters);
-      setSearchResults(response.data.results || []);
+      
+      // 검색 결과 가공
+      const processedResults = (response.data.results || []).map(result => {
+        // highlights 속성이 있는 경우 검색어 정보도 함께 추가
+        if (result.highlights && result.highlights.length > 0) {
+          return {
+            ...result,
+            searchTerm: query // 검색어 정보 추가
+          };
+        }
+        return result;
+      });
+      
+      setSearchResults(processedResults);
       
       // 검색 결과에서 사용 가능한 태그 추출
-      const uniqueTags = [...new Set(response.data.results.flatMap(doc => doc.tags || []))];
+      const uniqueTags = [...new Set(processedResults.flatMap(doc => doc.tags || []))];
       setAvailableTags(uniqueTags);
     } catch (error) {
       console.error('검색 오류:', error);
@@ -71,6 +88,7 @@ function SearchPage() {
     params.set('query', searchQuery);
     selectedTags.forEach(tag => params.append('tag', tag));
     params.set('sort', sortOrder);
+    params.set('type', searchType);
     
     navigate(`/search?${params.toString()}`);
   };
@@ -96,31 +114,120 @@ function SearchPage() {
     navigate(`/search?${params.toString()}`);
   };
 
+  // 검색 유형 변경
+  const handleSearchTypeChange = (e) => {
+    setSearchType(e.target.value);
+  };
+
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">문서 검색</h1>
           <p className="text-gray-600 mb-4">
-            원하는 키워드로 문서를 검색하세요. 태그를 선택하여 검색 결과를 필터링할 수 있습니다.
+            원하는 키워드로 문서를 검색하세요. 검색 유형을 선택하고 태그로 결과를 필터링할 수 있습니다.
           </p>
           
           {/* 검색 양식 */}
           <div className="mb-6">
-            <form onSubmit={handleSearchSubmit} className="flex rounded-md shadow-sm">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="검색어를 입력하세요"
-                className="flex-1 min-w-0 block w-full px-3 py-2 rounded-l-md border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              />
-              <button
-                type="submit"
-                className="inline-flex items-center px-4 py-2 border border-l-0 border-gray-300 text-sm font-medium rounded-r-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                검색
-              </button>
+            <form onSubmit={handleSearchSubmit} className="space-y-4">
+              {/* 검색 유형 선택 */}
+              <div className="flex flex-wrap gap-4 mb-2">
+                <div className="flex items-center">
+                  <input
+                    id="search-type-keyword"
+                    name="search-type"
+                    type="radio"
+                    value="keyword"
+                    checked={searchType === 'keyword'}
+                    onChange={handleSearchTypeChange}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                  />
+                  <label htmlFor="search-type-keyword" className="ml-2 block text-sm text-gray-700">
+                    키워드 검색
+                  </label>
+                </div>
+                <div className="flex items-center">
+                  <input
+                    id="search-type-pattern"
+                    name="search-type"
+                    type="radio"
+                    value="pattern"
+                    checked={searchType === 'pattern'}
+                    onChange={handleSearchTypeChange}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                  />
+                  <label htmlFor="search-type-pattern" className="ml-2 block text-sm text-gray-700">
+                    패턴 검색
+                  </label>
+                </div>
+                <div className="flex items-center">
+                  <input
+                    id="search-type-similar"
+                    name="search-type"
+                    type="radio"
+                    value="similar"
+                    checked={searchType === 'similar'}
+                    onChange={handleSearchTypeChange}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                  />
+                  <label htmlFor="search-type-similar" className="ml-2 block text-sm text-gray-700">
+                    유사 문서명 검색
+                  </label>
+                </div>
+                <div className="flex items-center">
+                  <input
+                    id="search-type-content"
+                    name="search-type"
+                    type="radio"
+                    value="content"
+                    checked={searchType === 'content'}
+                    onChange={handleSearchTypeChange}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                  />
+                  <label htmlFor="search-type-content" className="ml-2 block text-sm text-gray-700">
+                    문서 내용 검색
+                  </label>
+                </div>
+              </div>
+              
+              {/* 검색어 입력 필드 */}
+              <div className="flex rounded-md shadow-sm">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={
+                    searchType === 'pattern' 
+                      ? "검색 패턴을 입력하세요 (예: 2023*, *보고서, 회의록*)" 
+                      : searchType === 'similar' 
+                        ? "문서명을 입력하세요 (유사한 문서명을 찾습니다)" 
+                        : searchType === 'content' 
+                          ? "문서 내용을 입력하세요" 
+                          : "검색어를 입력하세요"
+                  }
+                  className="flex-1 min-w-0 block w-full px-3 py-2 rounded-l-md border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                />
+                <button
+                  type="submit"
+                  className="inline-flex items-center px-4 py-2 border border-l-0 border-gray-300 text-sm font-medium rounded-r-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  검색
+                </button>
+              </div>
+              
+              {/* 검색 유형 도움말 */}
+              <div className="text-xs text-gray-500 italic">
+                {searchType === 'pattern' && (
+                  <span>패턴 검색: '*'는 여러 문자, '?'는 한 문자를 대체합니다. 예) 2023*, *계약서, 회의록_2?2?</span>
+                )}
+                {searchType === 'similar' && (
+                  <span>유사 문서명 검색: 입력한 문서명과 유사한 이름을 가진 문서를 찾습니다.</span>
+                )}
+                {searchType === 'content' && (
+                  <span>문서 내용 검색: 문서 내용에서 키워드와 일치하는 문서를 찾습니다. 검색 결과에 본문 미리보기를 제공합니다.</span>
+                )}
+              </div>
             </form>
           </div>
           
@@ -197,7 +304,7 @@ function SearchPage() {
                 </svg>
               </div>
               <div className="ml-3">
-                <p className="text-sm text-yellow-700">검색 결과가 없습니다. 다른 검색어를 입력해보세요.</p>
+                <p className="text-sm text-yellow-700">검색 결과가 없습니다. 다른 검색어나 검색 유형을 시도해보세요.</p>
               </div>
             </div>
           </div>

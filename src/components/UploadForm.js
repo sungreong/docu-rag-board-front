@@ -359,6 +359,25 @@ function UploadForm({ onUploadSuccess }) {
     return html;
   };
 
+  // 유효기간 설정 부분 수정 
+  // 날짜 설정 헬퍼 함수 추가
+  const setDurationMonths = (months) => {
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setMonth(today.getMonth() + months);
+    
+    // YYYY-MM-DD 형식으로 변환
+    const formatDate = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    
+    setStartDate(formatDate(today));
+    setEndDate(formatDate(endDate));
+  };
+
   // 폼 제출 핸들러
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -633,6 +652,23 @@ function UploadForm({ onUploadSuccess }) {
                     {validityInfo.durationText} 동안 유효
                   </span>
                 )}
+              </div>
+              
+              {/* 빠른 기간 선택 버튼 추가 */}
+              <div className="mb-3">
+                <div className="text-sm text-gray-600 mb-1">빠른 기간 설정:</div>
+                <div className="flex flex-wrap gap-2">
+                  {[1, 2, 3, 6, 12].map((months) => (
+                    <button
+                      key={months}
+                      type="button"
+                      onClick={() => setDurationMonths(months)}
+                      className="px-3 py-1 text-xs font-medium rounded-lg bg-gray-100 text-gray-800 hover:bg-gray-200 transition-colors"
+                    >
+                      {months}개월
+                    </button>
+                  ))}
+                </div>
               </div>
               
               <div className="grid grid-cols-2 gap-4">

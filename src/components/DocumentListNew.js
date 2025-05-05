@@ -51,6 +51,7 @@ function DocumentListNew({
   onReject,
   onVectorize,
   onDeleteVector,
+  onEdit, // 문서 편집 콜백 함수
   initialViewType,
   initialStatusFilter,
   onListRefresh,
@@ -88,6 +89,18 @@ function DocumentListNew({
       setStatusFilter(initialStatusFilter);
     }
   }, [initialViewType, initialStatusFilter]);
+  
+  // 사용자 정보 디버깅 로그
+  useEffect(() => {
+    console.log('현재 로그인된 사용자 정보:', user);
+    // 로컬 스토리지에서 사용자 정보 확인
+    try {
+      const localStorageUser = JSON.parse(localStorage.getItem('user') || '{}');
+      console.log('로컬 스토리지 사용자 정보:', localStorageUser);
+    } catch (e) {
+      console.error('로컬 스토리지 사용자 정보 파싱 오류:', e);
+    }
+  }, [user]);
   
   // 문서 목록 로드 함수 - useCallback으로 감싸서 불필요한 재생성 방지
   const loadDocuments = useCallback(async () => {
@@ -250,6 +263,13 @@ function DocumentListNew({
 
   // 문서 미리보기 열기
   const handleOpenPreview = async (docId) => {
+    if (!docId) {
+      console.error('문서 ID가 없습니다. 미리보기를 열 수 없습니다.');
+      alert('문서 정보가 올바르지 않습니다. 페이지를 새로고침 후 다시 시도해주세요.');
+      return;
+    }
+    
+    console.log(`미리보기 열기: 문서 ID=${docId}, 타입=${typeof docId}`);
     setPreviewDoc(null);
     setIsPreviewLoading(true);
     setPreviewError(null);
@@ -367,6 +387,34 @@ function DocumentListNew({
     } catch (e) {
       console.error('날짜 형식 변환 오류:', e);
       return dateString;
+    }
+  };
+
+  // 문서 편집 핸들러
+  const handleEdit = (e, document) => {
+    e.stopPropagation(); // 이벤트 버블링 방지
+    
+    if (!document || !document.id) {
+      console.error('문서 객체나 ID가 없습니다:', document);
+      alert('문서 정보가 올바르지 않습니다. 페이지를 새로고침 후 다시 시도해주세요.');
+      return;
+    }
+    
+    console.log('편집할 문서 정보:', document);
+    console.log('문서 ID:', document.id, '타입:', typeof document.id);
+    
+    // 문서 ID가 문자열이 아닌 경우 문자열로 변환
+    const docId = String(document.id);
+    console.log('변환된 문서 ID:', docId);
+    
+    // 문서 객체 복사 및 ID 타입 확인
+    const documentToEdit = {
+      ...document,
+      id: docId
+    };
+    
+    if (onEdit) {
+      onEdit(documentToEdit);
     }
   };
 
@@ -534,25 +582,25 @@ function DocumentListNew({
                   </th>
                 )}
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  제목
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  태그
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  상태
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  업로더
+                  문서 제목 및 태그
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   등록일
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  상태
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  작성자
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  등록일시
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   공개여부
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  작업
+                  문서 관리
                 </th>
               </tr>
             </thead>
@@ -564,169 +612,252 @@ function DocumentListNew({
                   </td>
                 </tr>
               ) : (
-                documents.map((doc) => (
-                  <tr
-                    key={doc.id}
-                    className={`cursor-pointer hover:bg-gray-50 ${selectedDoc === doc.id ? 'bg-blue-50' : ''}`}
-                    onClick={() => handleOpenPreview(doc.id)}
-                  >
-                    {/* 체크박스 열 추가 */}
-                    {onSelectDocument && (
-                      <td 
-                        className="relative w-12 px-6 py-4 whitespace-nowrap" 
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <input
-                          type="checkbox"
-                          className="absolute h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                          checked={selectedDocuments.includes(doc.id)}
-                          onChange={(e) => onSelectDocument(doc.id, e.target.checked)}
-                        />
-                      </td>
-                    )}
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="flex flex-col">
-                        <div className="text-sm font-medium text-gray-900">{doc.title}</div>
-                        <div className="flex flex-wrap mt-1">
-                          {doc.tags && doc.tags.map((tag, index) => (
-                            <span key={index} className="mr-1 mb-1 px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-800">
-                              {tag}
-                            </span>
-                          ))}
+                documents.map((doc) => {
+                  // 디버깅용 콘솔 출력
+                  console.log('문서 객체 확인:', doc);
+                  console.log('문서 ID:', doc.id, '문서 타입:', typeof doc.id);
+                  console.log('문서 작성자 ID:', doc.user_id, '타입:', typeof doc.user_id);
+                  console.log('현재 사용자 ID:', user?.id, '타입:', typeof user?.id);
+                  console.log('서버에서 받은 사용자 email:', doc.uploader_email);
+                  console.log('현재 사용자 email:', user?.email);
+                  
+                  // ID 문자열 변환 처리
+                  const docUserId = doc.user_id ? String(doc.user_id) : '';
+                  const currentUserId = user?.id ? String(user.id) : '';
+                  
+                  // 이메일 기반 비교 (백업 비교 방식)
+                  const isOwnerByEmail = doc.uploader_email === user?.email && user?.email !== undefined;
+                  
+                  // ID 기반 비교
+                  const isOwnerById = docUserId === currentUserId && currentUserId !== '';
+                  
+                  // 소유자 확인 - ID 또는 이메일 일치 시
+                  const isOwner = isOwnerById || isOwnerByEmail;
+                  
+                  console.log('ID 기반 소유자 여부:', isOwnerById);
+                  console.log('이메일 기반 소유자 여부:', isOwnerByEmail);
+                  console.log('최종 소유자 여부:', isOwner);
+                  
+                  return (
+                    <tr
+                      key={doc.id}
+                      className={`cursor-pointer hover:bg-gray-50 ${selectedDoc === doc.id ? 'bg-blue-50' : ''}`}
+                      onClick={() => handleOpenPreview(doc.id)}
+                    >
+                      {/* 체크박스 열 추가 */}
+                      {onSelectDocument && (
+                        <td 
+                          className="relative w-12 px-6 py-4 whitespace-nowrap" 
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            className="absolute h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            checked={selectedDocuments.includes(doc.id)}
+                            onChange={(e) => onSelectDocument(doc.id, e.target.checked)}
+                          />
+                        </td>
+                      )}
+                      
+                      {/* 문서 제목 및 태그 */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex flex-col">
+                          <div className="text-sm font-medium text-gray-900">
+                            {doc.title}
+                          </div>
+                          <div className="flex flex-wrap mt-1">
+                            {doc.tags && doc.tags.map((tag, index) => (
+                              <span key={index} className="mr-1 mb-1 px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-800">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">{formatDate(doc.created_at)}</div>
-                      {doc.uploader_name && (
-                        <div className="text-xs text-gray-400 mt-1">{doc.uploader_name}</div>
-                      )}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="flex flex-col space-y-1">
-                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          doc.status === '승인완료' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {doc.status}
-                        </span>
-                        
-                        {/* 공개/비공개 상태 표시 추가 */}
-                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          doc.is_public ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {doc.is_public ? '공개' : '비공개'}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {doc.uploader_name || doc.uploader_email || '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(doc.created_at)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {doc.is_public ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                          공개
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                          비공개
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <div className="flex space-x-2">
-                        {/* 문서 소유자만 공개 설정 변경 가능 */}
-                        {doc.user_id === user?.id && (
-                          <>
-                            <button
-                              onClick={() => handleTogglePublicStatus(doc.id)}
-                              className="text-blue-600 hover:text-blue-900 bg-blue-50 px-2 py-1 rounded text-xs"
-                            >
-                              {doc.is_public ? '비공개로 전환' : '공개로 전환'}
-                            </button>
-                            
-                            <Link
-                              to={`/documents/edit/${doc.id}`}
-                              className="text-green-600 hover:text-green-900 bg-green-50 px-2 py-1 rounded text-xs"
-                            >
-                              수정
-                            </Link>
-                          </>
+                      </td>
+                      
+                      {/* 등록일 (간략 표시) */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-500">
+                          {formatDate(doc.created_at).split(' ')[0]} {/* 날짜만 표시 */}
+                        </div>
+                      </td>
+                      
+                      {/* 상태 */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="flex flex-col space-y-1">
+                          <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            doc.status === '승인완료' ? 'bg-green-100 text-green-800' : 
+                            doc.status === '승인대기' ? 'bg-yellow-100 text-yellow-800' : 
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {doc.status}
+                          </span>
+                          
+                          {/* 벡터화 상태 표시 추가 */}
+                          {doc.status === '승인완료' && (
+                            <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              doc.vectorized ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {doc.vectorized ? '벡터화됨' : '벡터화 안됨'}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      
+                      {/* 작성자 */}
+                      <td className="px-4 py-4 whitespace-nowrap text-sm">
+                        {doc.uploader_name || doc.uploader_email ? (
+                          <div className="flex flex-col">
+                            <span className="font-medium text-gray-900">{doc.uploader_name || doc.uploader_email}</span>
+                            {doc.uploader_name && doc.uploader_email && doc.uploader_name !== doc.uploader_email && (
+                              <span className="text-xs text-gray-500">{doc.uploader_email}</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-500">-</span>
                         )}
-
-                        {/* 관리자에게만 보이는 버튼들 */}
-                        {isAdmin && (
-                          <>
-                            {/* 관리자도 문서 소유자가 아니면 편집/공개 설정 가능 */}
-                            {doc.user_id !== user?.id && (
+                      </td>
+                      
+                      {/* 등록일시 (상세 표시) */}
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatDate(doc.created_at)}
+                      </td>
+                      
+                      {/* 공개여부 */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        {doc.is_public ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                            공개
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                            비공개
+                          </span>
+                        )}
+                      </td>
+                      
+                      {/* 문서 관리 */}
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <div className="flex space-x-2">
+                          {/* 문서 소유자인 경우에만 버튼 표시 */}
+                          {(() => {
+                            // 소유자 확인 로직
+                            const docUserId = doc.user_id ? String(doc.user_id) : '';
+                            const currentUserId = user?.id ? String(user.id) : '';
+                            const isOwnerById = docUserId === currentUserId && currentUserId !== '';
+                            const isOwnerByEmail = doc.uploader_email === user?.email && user?.email !== undefined;
+                            const isOwner = isOwnerById || isOwnerByEmail;
+                            
+                            return isOwner ? (
                               <>
+                                <span className="px-2 py-1 rounded text-xs bg-purple-100 text-purple-800">
+                                  내 문서
+                                </span>
                                 <button
-                                  onClick={() => handleTogglePublicStatus(doc.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleTogglePublicStatus(doc.id);
+                                  }}
                                   className="text-blue-600 hover:text-blue-900 bg-blue-50 px-2 py-1 rounded text-xs"
                                 >
                                   {doc.is_public ? '비공개로 전환' : '공개로 전환'}
                                 </button>
                                 
-                                <Link
-                                  to={`/documents/edit/${doc.id}`}
+                                <button
+                                  onClick={(e) => handleEdit(e, doc)}
                                   className="text-green-600 hover:text-green-900 bg-green-50 px-2 py-1 rounded text-xs"
                                 >
                                   수정
-                                </Link>
+                                </button>
                               </>
-                            )}
+                            ) : null;
+                          })()}
 
-                            {/* 승인 대기 문서만 승인/거부 버튼 표시 */}
-                            {doc.status === '승인대기' && (
-                              <>
-                                <button
-                                  onClick={() => handleApprove(doc.id)}
-                                  className="text-green-600 hover:text-green-900 bg-green-50 px-2 py-1 rounded text-xs"
-                                  title="이 문서를 승인합니다"
-                                >
-                                  승인
-                                </button>
+                          {/* 관리자에게만 보이는 버튼들 */}
+                          {isAdmin && (
+                            <>
+                              {/* 관리자임을 표시 */}
+                              <span className="px-2 py-1 rounded text-xs bg-red-100 text-red-800">
+                                관리자
+                              </span>
+                              
+                              {/* 관리자도 문서 소유자가 아니면 편집/공개 설정 가능 */}
+                              {(() => {
+                                // 소유자 확인 로직
+                                const docUserId = doc.user_id ? String(doc.user_id) : '';
+                                const currentUserId = user?.id ? String(user.id) : '';
+                                const isOwnerById = docUserId === currentUserId && currentUserId !== '';
+                                const isOwnerByEmail = doc.uploader_email === user?.email && user?.email !== undefined;
+                                const isOwner = isOwnerById || isOwnerByEmail;
                                 
-                                <button
-                                  onClick={() => handleReject(doc.id)}
-                                  className="text-red-600 hover:text-red-900 bg-red-50 px-2 py-1 rounded text-xs"
-                                  title="이 문서를 거부합니다"
-                                >
-                                  거부
-                                </button>
-                              </>
-                            )}
-                            
-                            {/* 승인된 문서만 벡터화 관련 버튼 표시 */}
-                            {doc.status === '승인완료' && (
-                              <>
-                                {!doc.vectorized ? (
+                                return !isOwner ? (
+                                  <>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleTogglePublicStatus(doc.id);
+                                      }}
+                                      className="text-blue-600 hover:text-blue-900 bg-blue-50 px-2 py-1 rounded text-xs"
+                                    >
+                                      {doc.is_public ? '비공개로 전환' : '공개로 전환'}
+                                    </button>
+                                    
+                                    <button
+                                      onClick={(e) => handleEdit(e, doc)}
+                                      className="text-green-600 hover:text-green-900 bg-green-50 px-2 py-1 rounded text-xs"
+                                    >
+                                      수정
+                                    </button>
+                                  </>
+                                ) : null;
+                              })()}
+
+                              {/* 승인 대기 문서만 승인/거부 버튼 표시 */}
+                              {doc.status === '승인대기' && (
+                                <>
                                   <button
-                                    onClick={() => onVectorize(doc.id)}
-                                    className="text-purple-600 hover:text-purple-900 bg-purple-50 px-2 py-1 rounded text-xs"
-                                    title="이 문서를 벡터 검색에 활용할 수 있도록 벡터화합니다"
+                                    onClick={() => handleApprove(doc.id)}
+                                    className="text-green-600 hover:text-green-900 bg-green-50 px-2 py-1 rounded text-xs"
                                   >
-                                    벡터화
+                                    승인
                                   </button>
-                                ) : (
+                                  
                                   <button
-                                    onClick={() => onDeleteVector(doc.id)}
-                                    className="text-orange-600 hover:text-orange-900 bg-orange-50 px-2 py-1 rounded text-xs"
-                                    title="이 문서의 벡터를 삭제합니다"
+                                    onClick={() => handleReject(doc.id)}
+                                    className="text-red-600 hover:text-red-900 bg-red-50 px-2 py-1 rounded text-xs"
                                   >
-                                    벡터 삭제
+                                    거부
                                   </button>
-                                )}
-                              </>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                                </>
+                              )}
+                              
+                              {/* 승인된 문서만 벡터화 관련 버튼 표시 */}
+                              {doc.status === '승인완료' && (
+                                <>
+                                  {!doc.vectorized ? (
+                                    <button
+                                      onClick={() => onVectorize(doc.id)}
+                                      className="text-purple-600 hover:text-purple-900 bg-purple-50 px-2 py-1 rounded text-xs"
+                                    >
+                                      벡터화
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => onDeleteVector(doc.id)}
+                                      className="text-orange-600 hover:text-orange-900 bg-orange-50 px-2 py-1 rounded text-xs"
+                                    >
+                                      벡터 삭제
+                                    </button>
+                                  )}
+                                </>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

@@ -50,6 +50,11 @@ function SearchResults({ results }) {
     
     alert(`${fileName} 다운로드를 시작합니다. (모의 기능)`);
   };
+  
+  // 검색 결과 하이라이트 HTML을 안전하게 렌더링
+  const renderHighlightedText = (text) => {
+    return { __html: text };
+  };
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
@@ -120,6 +125,26 @@ function SearchResults({ results }) {
                           </span>
                         ))}
                       </div>
+                      
+                      {/* 문서 내용 하이라이트 표시 */}
+                      {doc.highlights && doc.highlights.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-gray-100">
+                          <div className="text-xs text-gray-500 mb-1">본문 내용 미리보기:</div>
+                          {doc.highlights.map((highlight, idx) => (
+                            <div 
+                              key={idx} 
+                              className="text-xs text-gray-700 bg-yellow-50 border border-yellow-100 p-1 rounded mb-1"
+                            >
+                              <span dangerouslySetInnerHTML={renderHighlightedText(
+                                highlight.replace(
+                                  new RegExp(doc.searchTerm || '', 'gi'), 
+                                  match => `<mark class="bg-yellow-200 px-0.5 rounded">${match}</mark>`
+                                )
+                              )} />
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {doc.startDate && doc.endDate ? (
@@ -160,6 +185,28 @@ function SearchResults({ results }) {
                           <p className="text-sm text-gray-600 mb-4 whitespace-pre-line">
                             {doc.summary || '요약 내용이 없습니다.'}
                           </p>
+                          
+                          {/* 본문 검색 결과가 있는 경우 */}
+                          {doc.highlights && doc.highlights.length > 0 && (
+                            <>
+                              <h4 className="font-medium mb-2">본문 검색 결과</h4>
+                              <div className="bg-gray-50 p-3 rounded mb-4">
+                                {doc.highlights.map((highlight, idx) => (
+                                  <div 
+                                    key={idx} 
+                                    className="text-sm text-gray-700 border-b border-gray-200 last:border-b-0 py-2"
+                                  >
+                                    <span dangerouslySetInnerHTML={renderHighlightedText(
+                                      highlight.replace(
+                                        new RegExp(doc.searchTerm || '', 'gi'), 
+                                        match => `<mark class="bg-yellow-200 px-0.5 rounded">${match}</mark>`
+                                      )
+                                    )} />
+                                  </div>
+                                ))}
+                              </div>
+                            </>
+                          )}
                           
                           <h4 className="font-medium mb-2">첨부 파일</h4>
                           <div className="space-y-2">

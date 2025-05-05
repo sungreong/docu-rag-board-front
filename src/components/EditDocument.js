@@ -22,6 +22,7 @@ function EditDocument({ document, onEditSuccess, onCancel }) {
   const [showMarkdownPreview, setShowMarkdownPreview] = useState(false);
   const [vectorDbWarningShown, setVectorDbWarningShown] = useState(false);
   const [contentChanged, setContentChanged] = useState(false);
+  const [filesToDelete, setFilesToDelete] = useState([]);
   
   const fileInputRef = useRef(null);
   const tagInputRef = useRef(null);
@@ -53,14 +54,50 @@ function EditDocument({ document, onEditSuccess, onCancel }) {
     }
   }, [title, summary, tags, startDate, endDate, files, document, vectorDbWarningShown]);
 
-  // 기존 문서 정보 로드
+  // 기존 문서 정보 로드 개선
   useEffect(() => {
     if (document) {
+      console.log('문서 정보 로드:', document);
+      console.log('문서 ID:', getDocumentId());
+      
       setTitle(document.title || '');
       setSummary(document.summary || '');
       setTags(document.tags || []);
-      setStartDate(document.startDate || '');
-      setEndDate(document.endDate || '');
+      
+      // 날짜 필드 처리 개선 - 다양한 필드명 지원
+      let startDateValue = '';
+      let endDateValue = '';
+      
+      // startDate 또는 start_date 중 존재하는 값 사용
+      if (document.startDate) {
+        startDateValue = document.startDate;
+      } else if (document.start_date) {
+        startDateValue = document.start_date;
+      }
+      
+      // endDate 또는 end_date 중 존재하는 값 사용
+      if (document.endDate) {
+        endDateValue = document.endDate;
+      } else if (document.end_date) {
+        endDateValue = document.end_date;
+      }
+      
+      // ISO 형식이면 YYYY-MM-DD 형식으로 변환
+      if (startDateValue && startDateValue.includes('T')) {
+        startDateValue = startDateValue.split('T')[0];
+      }
+      
+      if (endDateValue && endDateValue.includes('T')) {
+        endDateValue = endDateValue.split('T')[0];
+      }
+      
+      console.log('설정할 날짜 - 시작:', startDateValue, '종료:', endDateValue);
+      
+      setStartDate(startDateValue);
+      setEndDate(endDateValue);
+      
+      // 파일 정보 로드
+      console.log('파일 목록:', getFileNames());
     }
   }, [document]);
 
@@ -177,6 +214,24 @@ function EditDocument({ document, onEditSuccess, onCancel }) {
     setValidityInfo(validity);
   }, [startDate, endDate]);
 
+  // 유효기간 빠른 선택 헬퍼 함수 추가
+  const setDurationMonths = (months) => {
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setMonth(today.getMonth() + months);
+    
+    // YYYY-MM-DD 형식으로 변환
+    const formatDate = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    
+    setStartDate(formatDate(today));
+    setEndDate(formatDate(endDate));
+  };
+
   // 업로드 폼 검증
   const validateForm = () => {
     const newErrors = {};
@@ -217,11 +272,52 @@ function EditDocument({ document, onEditSuccess, onCancel }) {
     return docEndDate >= today;
   };
 
-  // 폼 제출 핸들러
+  // 기존 파일 삭제 처리 함수 추가
+  const handleMarkFileForDeletion = (fileName) => {
+    setFilesToDelete(prev => [...prev, fileName]);
+  };
+
+  // 삭제 표시 취소 함수
+  const handleUnmarkFileForDeletion = (fileName) => {
+    setFilesToDelete(prev => prev.filter(name => name !== fileName));
+  };
+
+  // 파일 이름 변수를 가져오는 함수 추가
+  const getFileNames = () => {
+    if (document?.fileNames && Array.isArray(document.fileNames) && document.fileNames.length > 0) {
+      return document.fileNames;
+    } 
+    if (document?.file_names && Array.isArray(document.file_names) && document.file_names.length > 0) {
+      return document.file_names;
+    }
+    return [];
+  };
+
+  // 문서 아이디 추출 함수 추가
+  const getDocumentId = () => {
+    if (!document) return null;
+    
+    // id 필드가 있는 경우
+    if (document.id) return String(document.id);
+    
+    // _id 필드가 있는 경우 (몽고DB 형식)
+    if (document._id) return String(document._id);
+    
+    console.warn('문서에 ID 정보를 찾을 수 없습니다:', document);
+    return null;
+  };
+
+  // 폼 제출 핸들러 수정
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!validateForm()) {
+      return;
+    }
+    
+    const documentId = getDocumentId();
+    if (!documentId) {
+      alert('문서 ID를 찾을 수 없습니다. 페이지를 새로고침해주세요.');
       return;
     }
     
@@ -246,24 +342,40 @@ function EditDocument({ document, onEditSuccess, onCancel }) {
     setIsSubmitting(true);
     
     try {
-      // FormData 생성
+      // FormData 생성 - 필드명 일치시키기
       const formData = new FormData();
       formData.append('title', title);
       formData.append('summary', summary);
-      formData.append('startDate', startDate);
-      formData.append('endDate', endDate);
+      formData.append('start_date', startDate); // 서버 API와 필드명 일치
+      formData.append('end_date', endDate);     // 서버 API와 필드명 일치
       formData.append('tags', JSON.stringify(tags));
+      
+      // 디버깅 정보 (개발 중에만 필요)
+      console.log('문서 ID:', documentId);
+      console.log('제목:', title);
+      console.log('내용:', summary);
+      console.log('시작일:', startDate);
+      console.log('종료일:', endDate);
+      console.log('태그:', tags);
+
+      // 삭제할 파일 정보 추가
+      if (filesToDelete.length > 0) {
+        formData.append('files_to_delete', JSON.stringify(filesToDelete)); // 서버 API와 필드명 일치
+        console.log('삭제할 파일:', filesToDelete);
+      }
       
       // 파일 추가
       if (files.length > 0) {
+        console.log('추가할 파일:', files.map(f => f.name));
         files.forEach((file, index) => {
-          formData.append(`file${index}`, file);
+          formData.append(`files`, file); // 서버 API와 필드명 일치
         });
       }
       
       try {
         // 백엔드 API 호출
-        const response = await documentService.updateDocument(document.id, formData);
+        const response = await documentService.updateDocument(documentId, formData);
+        console.log('문서 업데이트 성공:', response);
         onEditSuccess(response.data);
         
         // 성공 알림
@@ -274,13 +386,23 @@ function EditDocument({ document, onEditSuccess, onCancel }) {
         // 백엔드 연결 실패 시 모의 응답 생성
         const mockResponse = {
           ...document,
+          id: documentId,
           title,
           summary,
           tags,
-          startDate,
-          endDate,
+          start_date: startDate,
+          end_date: endDate,
           vectorized: document.vectorized && !contentChanged
         };
+        
+        // 삭제 표시된 파일 제거
+        if (mockResponse.fileNames) {
+          mockResponse.fileNames = mockResponse.fileNames.filter(name => !filesToDelete.includes(name));
+        }
+        
+        if (mockResponse.file_names) {
+          mockResponse.file_names = mockResponse.file_names.filter(name => !filesToDelete.includes(name));
+        }
         
         onEditSuccess(mockResponse);
         
@@ -292,6 +414,32 @@ function EditDocument({ document, onEditSuccess, onCancel }) {
       alert('문서 수정 중 오류가 발생했습니다. 다시 시도해주세요.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // 파일 다운로드 함수 수정
+  const handleFileDownload = async (fileName) => {
+    const documentId = getDocumentId();
+    
+    if (!documentId || !fileName) {
+      alert('파일 정보가 올바르지 않습니다.');
+      return;
+    }
+    
+    try {
+      console.log(`파일 다운로드 요청: ${documentId}/${fileName}`);
+      
+      try {
+        // API를 통한 파일 다운로드
+        await documentService.downloadDocumentFile(documentId, fileName);
+        console.log('파일 다운로드 성공');
+      } catch (error) {
+        console.error('파일 다운로드 오류:', error);
+        alert('파일 다운로드 중 오류가 발생했습니다.');
+      }
+    } catch (error) {
+      console.error('파일 다운로드 처리 오류:', error);
+      alert('파일 다운로드 처리 중 오류가 발생했습니다.');
     }
   };
 
@@ -417,6 +565,23 @@ function EditDocument({ document, onEditSuccess, onCancel }) {
                 )}
               </div>
               
+              {/* 빠른 기간 선택 버튼 추가 */}
+              <div className="mb-3">
+                <div className="text-sm text-gray-600 mb-1">빠른 기간 설정:</div>
+                <div className="flex flex-wrap gap-2">
+                  {[1, 2, 3, 6, 12].map((months) => (
+                    <button
+                      key={months}
+                      type="button"
+                      onClick={() => setDurationMonths(months)}
+                      className="px-3 py-1 text-xs font-medium rounded-lg bg-gray-100 text-gray-800 hover:bg-gray-200 transition-colors"
+                    >
+                      {months}개월
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">
@@ -431,7 +596,6 @@ function EditDocument({ document, onEditSuccess, onCancel }) {
                     type="date"
                     id="startDate"
                     value={startDate}
-                    min={today}
                     onChange={(e) => setStartDate(e.target.value)}
                     className={`w-full p-2 border rounded-md ${errors.startDate || errors.dates ? 'border-red-500' : 'border-gray-300'}`}
                   />
@@ -537,30 +701,57 @@ function EditDocument({ document, onEditSuccess, onCancel }) {
               )}
 
               {/* 기존 파일 목록 */}
-              {document?.fileNames && document.fileNames.length > 0 && (
+              {getFileNames().length > 0 && (
                 <div className="mt-3 space-y-2">
                   <h4 className="text-sm font-medium text-gray-700">기존 첨부 파일:</h4>
                   <ul className="border rounded-md divide-y divide-gray-200 overflow-hidden">
-                    {document.fileNames.map((fileName, index) => (
-                      <li key={index} className="pl-3 pr-4 py-2 flex items-center justify-between text-sm">
-                        <div className="flex items-center">
-                          <svg className="h-5 w-5 text-gray-400 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                          </svg>
-                          <span className="truncate">{fileName}</span>
-                        </div>
-                        <div className="ml-4 flex-shrink-0">
-                          <button 
-                            type="button"
-                            className="text-blue-600 hover:text-blue-800 focus:outline-none"
-                            onClick={() => alert(`${fileName} 다운로드 예정`)}
-                          >
-                            보기
-                          </button>
-                        </div>
-                      </li>
-                    ))}
+                    {getFileNames().map((fileName, index) => {
+                      const isMarkedForDeletion = filesToDelete.includes(fileName);
+                      return (
+                        <li key={index} className={`pl-3 pr-4 py-2 flex items-center justify-between text-sm ${isMarkedForDeletion ? 'bg-red-50' : ''}`}>
+                          <div className="flex items-center">
+                            <svg className={`h-5 w-5 mr-3 ${isMarkedForDeletion ? 'text-red-400' : 'text-gray-400'}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                            <span className={`truncate ${isMarkedForDeletion ? 'line-through text-gray-400' : ''}`}>{fileName}</span>
+                          </div>
+                          <div className="ml-4 flex-shrink-0 space-x-2">
+                            {isMarkedForDeletion ? (
+                              <button 
+                                type="button"
+                                onClick={() => handleUnmarkFileForDeletion(fileName)}
+                                className="text-blue-600 hover:text-blue-800 focus:outline-none"
+                              >
+                                취소
+                              </button>
+                            ) : (
+                              <>
+                                <button 
+                                  type="button"
+                                  className="text-blue-600 hover:text-blue-800 focus:outline-none"
+                                  onClick={() => handleFileDownload(fileName)}
+                                >
+                                  다운로드
+                                </button>
+                                <button 
+                                  type="button"
+                                  onClick={() => handleMarkFileForDeletion(fileName)}
+                                  className="text-red-600 hover:text-red-800 focus:outline-none"
+                                >
+                                  삭제
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </li>
+                      );
+                    })}
                   </ul>
+                  {filesToDelete.length > 0 && (
+                    <p className="text-sm text-red-500 mt-2">
+                      {filesToDelete.length}개 파일이 삭제 예정입니다. 문서 저장 시 영구 삭제됩니다.
+                    </p>
+                  )}
                 </div>
               )}
             </div>

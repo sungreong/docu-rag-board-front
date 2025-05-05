@@ -56,7 +56,11 @@ const documentsApi = {
       
       // API 호출
       const url = `/documents?${queryParams.toString()}`;
-      return await apiClient.get(url);
+      console.log('문서 목록 조회 요청 URL:', url);
+      const response = await apiClient.get(url);
+      console.log('문서 목록 조회 응답:', response.data);
+      return response;
+
     } catch (error) {
       console.error('문서 목록 조회 오류:', error);
       throw error;
@@ -90,9 +94,19 @@ const documentsApi = {
   // 문서 상세 조회
   getDocument: async (documentId) => {
     try {
-      return await apiClient.get(`/documents/${documentId}`);
+      console.log('getDocument 호출됨 - 문서 ID:', documentId, '타입:', typeof documentId);
+      
+      // 문서 ID가 문자열이 아닌 경우 문자열로 변환
+      if (typeof documentId !== 'string') {
+        console.warn('문서 ID가 문자열이 아닙니다. 문자열로 변환합니다.');
+        documentId = String(documentId);
+      }
+      
+      const response = await apiClient.get(`/documents/${documentId}`);
+      console.log('문서 상세 조회 성공 - 응답:', response.data);
+      return response;
     } catch (error) {
-      console.error('문서 상세 조회 오류:', error);
+      console.error('문서 상세 조회 오류:', error, '요청 ID:', documentId);
       throw error;
     }
   },
@@ -144,40 +158,94 @@ const documentsApi = {
   },
 
   // 문서 업데이트
-  updateDocument: async (documentId, updateData) => {
+  updateDocument: async (documentId, formData) => {
     try {
-      // 날짜 형식 처리
-      const formattedData = { ...updateData };
+      // FormData에서 기본 필드 추출
+      const title = formData.get('title');
+      const summary = formData.get('summary');
+      const startDate = formData.get('startDate');
+      const endDate = formData.get('endDate');
+      const tagsStr = formData.get('tags');
+      const filesToDeleteStr = formData.get('filesToDelete');
       
-      // 문자열로 된 날짜를 ISO 형식으로 변환
-      if (formattedData.start_date && typeof formattedData.start_date === 'string') {
-        // 이미 ISO 형식이 아닌 경우에만 변환
-        if (!formattedData.start_date.includes('T')) {
-          const dateParts = formattedData.start_date.split('-');
-          if (dateParts.length === 3) {
-            const date = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
-            formattedData.start_date = date.toISOString().split('T')[0];
-          }
+      // 먼저 기존 문서 정보 조회
+      let existingDocument = {};
+      try {
+        const docResponse = await apiClient.get(`/documents/${documentId}`);
+        existingDocument = docResponse.data;
+        console.log('기존 문서 정보:', existingDocument);
+      } catch (err) {
+        console.warn('기존 문서 정보를 가져오지 못했습니다:', err);
+        // 에러가 발생해도 업데이트는 계속 진행
+      }
+      
+      // 업데이트 데이터 구성
+      const updateData = {
+        ...existingDocument,  // 기존 문서의 모든 필드 유지
+        title: title,
+        summary: summary,
+        start_date: startDate,
+        end_date: endDate,
+        tags: tagsStr ? JSON.parse(tagsStr) : existingDocument.tags || [],
+        status: '승인대기'  // 편집 시 항상 승인대기 상태로 변경
+      };
+      
+      // 파일 삭제 정보 처리
+      if (filesToDeleteStr) {
+        const filesToDelete = JSON.parse(filesToDeleteStr);
+        updateData.files_to_delete = filesToDelete;
+        
+        // 기존 파일 목록에서 삭제 표시된 파일 제외
+        if (existingDocument.file_names) {
+          updateData.file_names = existingDocument.file_names.filter(
+            name => !filesToDelete.includes(name)
+          );
+        }
+        
+        if (existingDocument.fileNames) {
+          updateData.fileNames = existingDocument.fileNames.filter(
+            name => !filesToDelete.includes(name)
+          );
         }
       }
       
-      if (formattedData.end_date && typeof formattedData.end_date === 'string') {
-        // 이미 ISO 형식이 아닌 경우에만 변환
-        if (!formattedData.end_date.includes('T')) {
-          const dateParts = formattedData.end_date.split('-');
-          if (dateParts.length === 3) {
-            const date = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
-            formattedData.end_date = date.toISOString().split('T')[0];
-          }
+      console.log('문서 업데이트 데이터:', updateData);
+      
+      // API 호출 (Form 데이터와 JSON 데이터 분리)
+      // 파일이 있는 경우 multipart/form-data로, 아닌 경우 json으로 전송
+      let hasFiles = false;
+      for (let pair of formData.entries()) {
+        if (pair[0].startsWith('file')) {
+          hasFiles = true;
+          break;
         }
       }
       
-      // 문서 상태를 승인 대기로 설정
-      formattedData.status = '승인대기';
-      
-      console.log('문서 업데이트 데이터:', formattedData);
-      const response = await apiClient.put(`/documents/${documentId}`, formattedData);
-      return response.data;
+      if (hasFiles) {
+        // 파일이 있는 경우 FormData로 전송
+        // FormData에 업데이트 데이터 추가
+        for (const key in updateData) {
+          if (key !== 'title' && key !== 'summary' && key !== 'start_date' && 
+              key !== 'end_date' && key !== 'tags' && key !== 'files_to_delete') {
+            if (typeof updateData[key] === 'object') {
+              formData.append(key, JSON.stringify(updateData[key]));
+            } else {
+              formData.append(key, updateData[key]);
+            }
+          }
+        }
+        
+        const response = await apiClient.put(`/documents/${documentId}`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+        return response;
+      } else {
+        // 파일이 없는 경우 JSON으로 전송
+        const response = await apiClient.put(`/documents/${documentId}`, updateData);
+        return response;
+      }
     } catch (error) {
       console.error('문서 업데이트 오류:', error);
       throw error;
