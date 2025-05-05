@@ -54,7 +54,9 @@ function DocumentListNew({
   initialViewType,
   initialStatusFilter,
   onListRefresh,
-  forceUpdate // 강제 새로고침 트리거
+  forceUpdate, // 강제 새로고침 트리거
+  onSelectDocument, // 문서 선택 콜백 함수
+  selectedDocuments = [] // 선택된 문서 ID 배열
 }) {
   const [documents, setDocuments] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -388,9 +390,9 @@ function DocumentListNew({
                 전체 문서
               </button>
             )}
-            
-            <button
-              onClick={() => setViewType('public')}
+            {isAdmin && (
+              <button
+                onClick={() => setViewType('public')}
               className={`px-3 py-1 text-sm font-medium rounded-md ${
                 viewType === 'public'
                   ? 'bg-blue-100 text-blue-700'
@@ -399,6 +401,7 @@ function DocumentListNew({
             >
               공개 문서
             </button>
+            )}
             
             <button
               onClick={() => setViewType('my')}
@@ -524,6 +527,12 @@ function DocumentListNew({
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                {/* 체크박스 열 추가 */}
+                {onSelectDocument && (
+                  <th scope="col" className="relative w-12 px-6 py-3">
+                    <span className="sr-only">선택</span>
+                  </th>
+                )}
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   제목
                 </th>
@@ -561,6 +570,20 @@ function DocumentListNew({
                     className={`cursor-pointer hover:bg-gray-50 ${selectedDoc === doc.id ? 'bg-blue-50' : ''}`}
                     onClick={() => handleOpenPreview(doc.id)}
                   >
+                    {/* 체크박스 열 추가 */}
+                    {onSelectDocument && (
+                      <td 
+                        className="relative w-12 px-6 py-4 whitespace-nowrap" 
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          className="absolute h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          checked={selectedDocuments.includes(doc.id)}
+                          onChange={(e) => onSelectDocument(doc.id, e.target.checked)}
+                        />
+                      </td>
+                    )}
                     <td className="px-4 py-4 whitespace-nowrap">
                       <div className="flex flex-col">
                         <div className="text-sm font-medium text-gray-900">{doc.title}</div>

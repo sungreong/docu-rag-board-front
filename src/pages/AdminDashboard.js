@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { adminApi } from '../api/adminService';
 import DocumentListNew from '../components/DocumentListNew';
 import UserManagement from '../components/UserManagement';
+import Layout from '../components/Layout';
 
 function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(false);
@@ -171,33 +172,7 @@ function AdminDashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* 네비게이션 바 */}
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
-              <div className="flex-shrink-0 flex items-center">
-                <h1 className="text-xl font-bold text-blue-600">문서관리 시스템</h1>
-              </div>
-              <div className="ml-6 flex space-x-8">
-                <Link
-                  to="/"
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  일반 모드로 전환
-                </Link>
-              </div>
-            </div>
-            <div className="flex items-center">
-              <span className="inline-flex items-center px-3 py-1 text-sm font-medium rounded-full bg-blue-100 text-blue-800">
-                관리자 모드
-              </span>
-            </div>
-          </div>
-        </div>
-      </nav>
-
+    <Layout>
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-gray-900">관리자 대시보드</h1>
@@ -360,7 +335,7 @@ function AdminDashboard() {
           <UserManagement />
         )}
       </div>
-    </div>
+    </Layout>
   );
 }
 

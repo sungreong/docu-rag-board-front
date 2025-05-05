@@ -149,6 +149,66 @@ const adminApi = {
       console.error('관리자 통계 조회 오류:', error);
       throw error;
     }
+  },
+
+  // 사용자 벡터화 요청 목록 조회
+  getVectorizeRequests: async () => {
+    try {
+      return await apiClient.get('/admin/requests/vectorize');
+    } catch (error) {
+      console.error('벡터화 요청 목록 조회 오류:', error);
+      throw error;
+    }
+  },
+
+  // 사용자 벡터 삭제 요청 목록 조회
+  getDeleteVectorRequests: async () => {
+    try {
+      return await apiClient.get('/admin/requests/delete-vector');
+    } catch (error) {
+      console.error('벡터 삭제 요청 목록 조회 오류:', error);
+      throw error;
+    }
+  },
+
+  // 벡터화 요청 승인
+  approveVectorizeRequest: async (requestId) => {
+    try {
+      return await apiClient.post(`/admin/requests/vectorize/${requestId}/approve`);
+    } catch (error) {
+      console.error('벡터화 요청 승인 오류:', error);
+      throw error;
+    }
+  },
+
+  // 벡터화 요청 거부
+  rejectVectorizeRequest: async (requestId, reason = '') => {
+    try {
+      return await apiClient.post(`/admin/requests/vectorize/${requestId}/reject`, { reason });
+    } catch (error) {
+      console.error('벡터화 요청 거부 오류:', error);
+      throw error;
+    }
+  },
+
+  // 벡터 삭제 요청 승인
+  approveDeleteVectorRequest: async (requestId) => {
+    try {
+      return await apiClient.post(`/admin/requests/delete-vector/${requestId}/approve`);
+    } catch (error) {
+      console.error('벡터 삭제 요청 승인 오류:', error);
+      throw error;
+    }
+  },
+
+  // 벡터 삭제 요청 거부
+  rejectDeleteVectorRequest: async (requestId, reason = '') => {
+    try {
+      return await apiClient.post(`/admin/requests/delete-vector/${requestId}/reject`, { reason });
+    } catch (error) {
+      console.error('벡터 삭제 요청 거부 오류:', error);
+      throw error;
+    }
   }
 };
 

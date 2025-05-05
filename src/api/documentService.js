@@ -312,6 +312,43 @@ const documentsApi = {
       throw error;
     }
   },
+
+  // 벡터화 요청 API (일반 사용자용)
+  requestVectorizeDocument: async (documentId) => {
+    try {
+      return await apiClient.post(`/documents/${documentId}/request-vectorize`);
+    } catch (error) {
+      console.error('벡터화 요청 오류:', error);
+      throw error;
+    }
+  },
+
+  // 벡터 삭제 요청 API (일반 사용자용)
+  requestDeleteDocumentVector: async (documentId) => {
+    try {
+      return await apiClient.post(`/documents/${documentId}/request-delete-vector`);
+    } catch (error) {
+      console.error('벡터 삭제 요청 오류:', error);
+      throw error;
+    }
+  },
+
+  // 검색 API
+  searchDocuments: async (query, filters = {}) => {
+    try {
+      // 검색 쿼리와 필터 파라미터 구성
+      const params = new URLSearchParams({
+        query: query,
+        ...filters
+      });
+      
+      const response = await apiClient.get(`/documents/search?${params.toString()}`);
+      return response;
+    } catch (error) {
+      console.error('문서 검색 오류:', error);
+      throw error;
+    }
+  },
 };
 
 export { documentsApi }; 

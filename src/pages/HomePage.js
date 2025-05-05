@@ -4,32 +4,13 @@ import DocumentListNew from '../components/DocumentListNew';
 import { useAuth } from '../utils/AuthContext';
 import { documentsApi } from '../api/documentService';
 import { adminApi } from '../api/adminService';
+import Layout from '../components/Layout';
 
 function HomePage() {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
-
-  // 문서 승인 처리 함수
-  const handleApproveDocument = async (documentId) => {
-    try {
-      await documentsApi.approveDocument(documentId);
-      alert('문서가 승인되었습니다.');
-    } catch (error) {
-      console.error('문서 승인 오류:', error);
-      alert('문서 승인 중 오류가 발생했습니다.');
-    }
-  };
-
-  // 문서 거부 처리 함수
-  const handleRejectDocument = async (documentId, reason = '') => {
-    try {
-      await documentsApi.rejectDocument(documentId, reason);
-      alert('문서가 거부되었습니다.');
-    } catch (error) {
-      console.error('문서 거부 오류:', error);
-      alert('문서 거부 중 오류가 발생했습니다.');
-    }
-  };
+  const [selectedDocuments, setSelectedDocuments] = useState([]);
+  const [forceUpdate, setForceUpdate] = useState(0);
 
   // 문서 벡터화 처리 함수 (관리자 전용)
   const handleVectorizeDocument = async (documentId, options = {}) => {
@@ -38,6 +19,7 @@ function HomePage() {
     try {
       await adminApi.vectorizeDocument(documentId, options);
       alert('문서 벡터화 작업이 요청되었습니다.');
+      setForceUpdate(prev => prev + 1);
     } catch (error) {
       console.error('문서 벡터화 오류:', error);
       alert('문서 벡터화 중 오류가 발생했습니다.');
@@ -51,77 +33,117 @@ function HomePage() {
     try {
       await adminApi.deleteDocumentVector(documentId);
       alert('문서 벡터가 삭제되었습니다.');
+      setForceUpdate(prev => prev + 1);
     } catch (error) {
       console.error('벡터 삭제 오류:', error);
       alert('벡터 삭제 중 오류가 발생했습니다.');
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* 네비게이션 바 */}
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
-              <div className="flex-shrink-0 flex items-center">
-                <h1 className="text-xl font-bold text-blue-600">문서관리 시스템</h1>
-              </div>
-              <div className="ml-6 flex space-x-8">
-                <Link
-                  to="/upload"
-                  className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 border-b-2 border-transparent hover:border-blue-500"
-                >
-                  문서 업로드
-                </Link>
-                <Link
-                  to="/search"
-                  className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 border-b-2 border-transparent hover:border-blue-500"
-                >
-                  문서 검색
-                </Link>
-                {user && user.role === 'admin' && (
-                  <Link
-                    to="/admin"
-                    className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 border-b-2 border-transparent hover:border-blue-500"
-                  >
-                    관리자 대시보드
-                  </Link>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center">
-              {isAuthenticated ? (
-                <div className="flex items-center space-x-4">
-                  <span className="text-sm text-gray-700">
-                    <span className="font-semibold">{user.email}</span>
-                    {user.role === 'admin' && <span className="ml-1 text-xs text-blue-600">(관리자)</span>}
-                  </span>
-                  <button
-                    onClick={logout}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                  >
-                    로그아웃
-                  </button>
-                </div>
-              ) : (
-                <Link
-                  to="/auth"
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                >
-                  로그인
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-      </nav>
+  // 문서 벡터화 요청 함수 (일반 사용자용)
+  const handleRequestVectorize = async (documentId) => {
+    try {
+      await documentsApi.requestVectorizeDocument(documentId);
+      alert('문서 벡터화 요청이 등록되었습니다. 관리자 승인 후 처리됩니다.');
+      setForceUpdate(prev => prev + 1);
+    } catch (error) {
+      console.error('벡터화 요청 오류:', error);
+      alert('벡터화 요청 중 오류가 발생했습니다.');
+    }
+  };
 
+  // 벡터 삭제 요청 함수 (일반 사용자용)
+  const handleRequestDeleteVector = async (documentId) => {
+    try {
+      await documentsApi.requestDeleteDocumentVector(documentId);
+      alert('벡터 삭제 요청이 등록되었습니다. 관리자 승인 후 처리됩니다.');
+      setForceUpdate(prev => prev + 1);
+    } catch (error) {
+      console.error('벡터 삭제 요청 오류:', error);
+      alert('벡터 삭제 요청 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 선택한 문서 처리를 위한 함수들
+  const handleDocumentSelect = (docId, isSelected) => {
+    if (isSelected) {
+      setSelectedDocuments(prev => [...prev, docId]);
+    } else {
+      setSelectedDocuments(prev => prev.filter(id => id !== docId));
+    }
+  };
+
+  // 선택한 문서 삭제
+  const handleDeleteSelected = async () => {
+    if (!selectedDocuments.length) return;
+    
+    if (window.confirm(`선택한 ${selectedDocuments.length}개의 문서를 삭제하시겠습니까?`)) {
+      try {
+        // 순차적으로 삭제 처리
+        for (const docId of selectedDocuments) {
+          await documentsApi.deleteMyDocument(docId);
+        }
+        
+        alert(`${selectedDocuments.length}개의 문서가 삭제되었습니다.`);
+        setSelectedDocuments([]);
+        setForceUpdate(prev => prev + 1);
+      } catch (error) {
+        console.error('문서 일괄 삭제 오류:', error);
+        alert('일부 문서 삭제 중 오류가 발생했습니다.');
+      }
+    }
+  };
+
+  // 선택한 문서 벡터화 요청
+  const handleRequestVectorizeSelected = async () => {
+    if (!selectedDocuments.length) return;
+    
+    if (window.confirm(`선택한 ${selectedDocuments.length}개의 문서에 대해 벡터화를 요청하시겠습니까?`)) {
+      try {
+        // 순차적으로 벡터화 요청 처리
+        for (const docId of selectedDocuments) {
+          await documentsApi.requestVectorizeDocument(docId);
+        }
+        
+        alert(`${selectedDocuments.length}개의 문서에 대한 벡터화가 요청되었습니다.`);
+        setSelectedDocuments([]);
+        setForceUpdate(prev => prev + 1);
+      } catch (error) {
+        console.error('문서 일괄 벡터화 요청 오류:', error);
+        alert('일부 문서 벡터화 요청 중 오류가 발생했습니다.');
+      }
+    }
+  };
+
+  // 선택한 문서 벡터 삭제 요청
+  const handleRequestDeleteVectorSelected = async () => {
+    if (!selectedDocuments.length) return;
+    
+    if (window.confirm(`선택한 ${selectedDocuments.length}개의 문서의 벡터 삭제를 요청하시겠습니까?`)) {
+      try {
+        // 순차적으로 벡터 삭제 요청 처리
+        for (const docId of selectedDocuments) {
+          await documentsApi.requestDeleteDocumentVector(docId);
+        }
+        
+        alert(`${selectedDocuments.length}개의 문서의 벡터 삭제가 요청되었습니다.`);
+        setSelectedDocuments([]);
+        setForceUpdate(prev => prev + 1);
+      } catch (error) {
+        console.error('문서 일괄 벡터 삭제 요청 오류:', error);
+        alert('일부 문서 벡터 삭제 요청 중 오류가 발생했습니다.');
+      }
+    }
+  };
+
+  return (
+    <Layout>
       <div className="container mx-auto px-4 py-8">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">문서 게시판</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">내 문서 관리</h1>
           <p className="text-gray-600 mb-4">
-            승인된 공개 문서를 확인하거나, 내가 올린 문서를 관리하세요.
+            내가 업로드한 문서들을 관리하세요. 상태를 확인하고 필요한 조치를 취할 수 있습니다.
+            승인된 문서는 공개 여부 설정에 따라 전체 문서 게시판에 표시됩니다.
           </p>
           
           {/* 검색창 */}
@@ -145,7 +167,34 @@ function HomePage() {
 
           {/* 문서 업로드 버튼 */}
           <div className="flex justify-between mb-6">
-            <div></div>
+            {/* 선택된 문서 작업 버튼 */}
+            <div className="flex space-x-2">
+              {selectedDocuments.length > 0 && (
+                <>
+                  <button
+                    onClick={handleDeleteSelected}
+                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
+                  >
+                    선택 삭제 ({selectedDocuments.length})
+                  </button>
+                  
+                  <button
+                    onClick={handleRequestVectorizeSelected}
+                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700"
+                  >
+                    선택 벡터화 요청 ({selectedDocuments.length})
+                  </button>
+                  
+                  <button
+                    onClick={handleRequestDeleteVectorSelected}
+                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700"
+                  >
+                    선택 벡터 삭제 요청 ({selectedDocuments.length})
+                  </button>
+                </>
+              )}
+            </div>
+            
             <Link
               to="/upload"
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -161,15 +210,16 @@ function HomePage() {
         {/* 문서 목록 */}
         <DocumentListNew 
           isAdmin={user?.role === 'admin'}
-          onApprove={handleApproveDocument}
-          onReject={handleRejectDocument}
-          onVectorize={handleVectorizeDocument}
-          onDeleteVector={handleDeleteVector}
-          initialViewType="public"  // 기본적으로 공개 문서만 보이도록 설정
-          initialStatusFilter="승인완료"  // 기본적으로 승인된 문서만 보이도록 설정
+          onVectorize={user?.role === 'admin' ? handleVectorizeDocument : handleRequestVectorize}
+          onDeleteVector={user?.role === 'admin' ? handleDeleteVector : handleRequestDeleteVector}
+          initialViewType="my"  // 내 문서만 보이도록 설정
+          initialStatusFilter=""  // 모든 상태의 문서 표시
+          forceUpdate={forceUpdate}
+          onSelectDocument={handleDocumentSelect}
+          selectedDocuments={selectedDocuments}
         />
       </div>
-    </div>
+    </Layout>
   );
 }
 

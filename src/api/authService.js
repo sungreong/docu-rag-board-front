@@ -24,7 +24,7 @@ export const login = async (email, password) => {
       
       // 관리자 계정 체크 - 이메일로 관리자 판단
       let role = 'user';
-      if (email === 'admin@boardrag.com') {
+      if (email === process.env.REACT_APP_ADMIN_EMAIL) {
         role = 'admin';
       }
       
