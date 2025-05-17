@@ -171,7 +171,7 @@ function UploadForm({ onUploadSuccess }) {
   const validateForm = () => {
     const newErrors = {};
     
-    if (!title.trim()) {
+    if (title.trim() === '') {
       newErrors.title = '제목을 입력해주세요';
     }
     
@@ -179,11 +179,7 @@ function UploadForm({ onUploadSuccess }) {
       newErrors.summary = '요약 내용을 입력해주세요';
     }
     
-    if (files.length === 0) {
-      newErrors.files = '최소 하나의 파일을 업로드해주세요';
-    }
-    
-    if (!startDate) {
+        if (!startDate) {
       newErrors.startDate = '시작일을 입력해주세요';
     }
     
