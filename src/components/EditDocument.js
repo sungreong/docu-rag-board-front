@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { documentService } from '../api';
+import { getSystemTags } from '../api/tags';
 
 function EditDocument({ document, onEditSuccess, onCancel }) {
   const [title, setTitle] = useState(document?.title || '');
@@ -23,15 +24,24 @@ function EditDocument({ document, onEditSuccess, onCancel }) {
   const [vectorDbWarningShown, setVectorDbWarningShown] = useState(false);
   const [contentChanged, setContentChanged] = useState(false);
   const [filesToDelete, setFilesToDelete] = useState([]);
+  const [suggestedTags, setSuggestedTags] = useState([]);
   
   const fileInputRef = useRef(null);
   const tagInputRef = useRef(null);
 
-  // 기존 태그 목록 (실제로는 API에서 가져올 것)
-  const suggestedTags = [
-    '공지사항', '중요', '보고서', '인사', '회계', '개발', '마케팅', 
-    '영업', '프로젝트', '회의', '계약', '교육', '정책', '규정'
-  ];
+  // 시스템 태그 로드
+  useEffect(() => {
+    const loadSystemTags = async () => {
+      try {
+        const response = await getSystemTags();
+        setSuggestedTags(response.map(tag => tag.name));
+      } catch (error) {
+        console.error('시스템 태그 로드 실패:', error);
+      }
+    };
+    
+    loadSystemTags();
+  }, []);
 
   // 내용 변경 감지
   useEffect(() => {

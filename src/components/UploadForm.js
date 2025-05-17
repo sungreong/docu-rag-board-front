@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { documentService } from '../api';
 import TaskProgress from './TaskProgress';
 import FileUploadStatus from './FileUploadStatus';
+import { getSystemTags } from '../api/tags';
 
 function UploadForm({ onUploadSuccess }) {
   const [title, setTitle] = useState('');
@@ -26,15 +27,24 @@ function UploadForm({ onUploadSuccess }) {
   const [uploadComplete, setUploadComplete] = useState(false);
   const [uploadedDocumentId, setUploadedDocumentId] = useState(null);
   const [isPublic, setIsPublic] = useState(true);
+  const [suggestedTags, setSuggestedTags] = useState([]);
   
   const fileInputRef = useRef(null);
   const tagInputRef = useRef(null);
 
-  // 기존 태그 목록 (실제로는 API에서 가져올 것)
-  const suggestedTags = [
-    '공지사항', '중요', '보고서', '인사', '회계', '개발', '마케팅', 
-    '영업', '프로젝트', '회의', '계약', '교육', '정책', '규정'
-  ];
+  // 시스템 태그 로드
+  useEffect(() => {
+    const loadSystemTags = async () => {
+      try {
+        const response = await getSystemTags();
+        setSuggestedTags(response.map(tag => tag.name));
+      } catch (error) {
+        console.error('시스템 태그 로드 실패:', error);
+      }
+    };
+    
+    loadSystemTags();
+  }, []);
 
   // 파일 선택 핸들러
   const handleFileChange = (e) => {
@@ -626,7 +636,7 @@ function UploadForm({ onUploadSuccess }) {
                 <div className="flex flex-wrap gap-1">
                   {suggestedTags
                     .filter(tag => !tags.includes(tag))
-                    .slice(0, 10)
+                    .slice(0, 30)
                     .map((tag, index) => (
                       <button
                         key={index}

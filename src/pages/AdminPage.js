@@ -6,6 +6,7 @@ import { documentsApi } from '../api/documentService';
 import { adminApi } from '../api/adminService';
 import Layout from '../components/Layout';
 import UserManagement from '../components/UserManagement';
+import TagManagement from '../components/admin/TagManagement';
 
 function AdminPage() {
   const { user } = useAuth();
@@ -13,7 +14,7 @@ function AdminPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [forceUpdate, setForceUpdate] = useState(0);
   const [selectedDocuments, setSelectedDocuments] = useState([]);
-  const [activeTab, setActiveTab] = useState('documents'); // 'documents' 또는 'users'
+  const [activeTab, setActiveTab] = useState('documents'); // 'documents', 'users', 'tags'
 
   // 비관리자가 접근하면 홈으로 리다이렉트
   useEffect(() => {
@@ -220,6 +221,16 @@ function AdminPage() {
               >
                 사용자 관리
               </button>
+              <button
+                onClick={() => setActiveTab('tags')}
+                className={`${
+                  activeTab === 'tags'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm`}
+              >
+                태그 관리
+              </button>
             </nav>
           </div>
           
@@ -312,6 +323,15 @@ function AdminPage() {
                 사용자 계정을 관리하고, 승인/비활성화/활성화 처리를 할 수 있습니다.
               </p>
               <UserManagement />
+            </>
+          )}
+
+          {activeTab === 'tags' && (
+            <>
+              <p className="text-gray-600 mb-4">
+                시스템 태그를 관리하고 사용자 태그 현황을 확인할 수 있습니다.
+              </p>
+              <TagManagement />
             </>
           )}
         </div>
