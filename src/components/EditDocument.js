@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { documentService } from '../api';
-import { getSystemTags } from '../api/tags';
+import { tagsApi } from '../api/tags';
 
 function EditDocument({ document, onEditSuccess, onCancel }) {
   const [title, setTitle] = useState(document?.title || '');
@@ -33,7 +33,7 @@ function EditDocument({ document, onEditSuccess, onCancel }) {
   useEffect(() => {
     const loadSystemTags = async () => {
       try {
-        const response = await getSystemTags();
+        const response = await tagsApi.getSystemTags();
         setSuggestedTags(response.map(tag => tag.name));
       } catch (error) {
         console.error('시스템 태그 로드 실패:', error);

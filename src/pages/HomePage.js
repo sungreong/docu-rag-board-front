@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import DocumentListNew from '../components/DocumentListNew';
+import TagManager from '../components/TagManager';
 import { useAuth } from '../utils/AuthContext';
 import { documentsApi } from '../api/documentService';
 import { adminApi } from '../api/adminService';
@@ -9,6 +10,7 @@ import EditDocument from '../components/EditDocument';
 
 function HomePage() {
   const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState('documents'); // 'documents' or 'tags'
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDocuments, setSelectedDocuments] = useState([]);
   const [forceUpdate, setForceUpdate] = useState(0);
@@ -219,84 +221,117 @@ function HomePage() {
           <>
             <div className="mb-6">
               <h1 className="text-2xl font-bold text-gray-900 mb-4">내 문서 관리</h1>
-              <p className="text-gray-600 mb-4">
-                내가 업로드한 문서들을 관리하세요. 상태를 확인하고 필요한 조치를 취할 수 있습니다.
-                승인된 문서는 공개 여부 설정에 따라 전체 문서 게시판에 표시됩니다.
-              </p>
               
-              {/* 검색창 */}
-              <div className="mb-6">
-                <div className="flex rounded-md shadow-sm">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="제목, 태그, 내용으로 검색"
-                    className="flex-1 min-w-0 block w-full px-3 py-2 rounded-l-md border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  />
-                  <Link
-                    to={`/search?query=${encodeURIComponent(searchQuery)}`}
-                    className="inline-flex items-center px-4 py-2 border border-l-0 border-gray-300 text-sm font-medium rounded-r-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              {/* 탭 메뉴 */}
+              <div className="border-b border-gray-200 mb-6">
+                <nav className="-mb-px flex space-x-8">
+                  <button
+                    onClick={() => setActiveTab('documents')}
+                    className={`${
+                      activeTab === 'documents'
+                        ? 'border-blue-500 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
                   >
-                    검색
-                  </Link>
-                </div>
+                    문서 관리
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('tags')}
+                    className={`${
+                      activeTab === 'tags'
+                        ? 'border-blue-500 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                  >
+                    태그 관리
+                  </button>
+                </nav>
               </div>
 
-              {/* 문서 업로드 버튼 */}
-              <div className="flex justify-between mb-6">
-                {/* 선택된 문서 작업 버튼 */}
-                <div className="flex space-x-2">
-                  {selectedDocuments.length > 0 && (
-                    <>
-                      <button
-                        onClick={handleDeleteSelected}
-                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
+              {activeTab === 'documents' ? (
+                <>
+                  <p className="text-gray-600 mb-4">
+                    내가 업로드한 문서들을 관리하세요. 상태를 확인하고 필요한 조치를 취할 수 있습니다.
+                    승인된 문서는 공개 여부 설정에 따라 전체 문서 게시판에 표시됩니다.
+                  </p>
+                  
+                  {/* 검색창 */}
+                  <div className="mb-6">
+                    <div className="flex rounded-md shadow-sm">
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="제목, 태그, 내용으로 검색"
+                        className="flex-1 min-w-0 block w-full px-3 py-2 rounded-l-md border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      />
+                      <Link
+                        to={`/search?query=${encodeURIComponent(searchQuery)}`}
+                        className="inline-flex items-center px-4 py-2 border border-l-0 border-gray-300 text-sm font-medium rounded-r-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                       >
-                        선택 삭제 ({selectedDocuments.length})
-                      </button>
-                      
-                      <button
-                        onClick={handleRequestVectorizeSelected}
-                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700"
-                      >
-                        선택 벡터화 요청 ({selectedDocuments.length})
-                      </button>
-                      
-                      <button
-                        onClick={handleRequestDeleteVectorSelected}
-                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700"
-                      >
-                        선택 벡터 삭제 요청 ({selectedDocuments.length})
-                      </button>
-                    </>
-                  )}
-                </div>
-                
-                <Link
-                  to="/upload"
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  문서 업로드
-                </Link>
-              </div>
+                        검색
+                      </Link>
+                    </div>
+                  </div>
+
+                  {/* 문서 업로드 버튼 */}
+                  <div className="flex justify-between mb-6">
+                    {/* 선택된 문서 작업 버튼 */}
+                    <div className="flex space-x-2">
+                      {selectedDocuments.length > 0 && (
+                        <>
+                          <button
+                            onClick={handleDeleteSelected}
+                            className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
+                          >
+                            선택 삭제 ({selectedDocuments.length})
+                          </button>
+                          
+                          <button
+                            onClick={handleRequestVectorizeSelected}
+                            className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700"
+                          >
+                            선택 벡터화 요청 ({selectedDocuments.length})
+                          </button>
+                          
+                          <button
+                            onClick={handleRequestDeleteVectorSelected}
+                            className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700"
+                          >
+                            선택 벡터 삭제 요청 ({selectedDocuments.length})
+                          </button>
+                        </>
+                      )}
+                    </div>
+                    
+                    <Link
+                      to="/upload"
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      문서 업로드
+                    </Link>
+                  </div>
+
+                  {/* 문서 목록 */}
+                  <DocumentListNew 
+                    isAdmin={user?.role === 'admin'}
+                    onVectorize={user?.role === 'admin' ? handleVectorizeDocument : handleRequestVectorize}
+                    onDeleteVector={user?.role === 'admin' ? handleDeleteVector : handleRequestDeleteVector}
+                    onEdit={handleEditDocument}
+                    initialViewType="my"  // 내 문서만 보이도록 설정
+                    initialStatusFilter=""  // 모든 상태의 문서 표시
+                    forceUpdate={forceUpdate}
+                    onSelectDocument={handleDocumentSelect}
+                    selectedDocuments={selectedDocuments}
+                  />
+                </>
+              ) : (
+                <TagManager />
+              )}
             </div>
-
-            {/* 문서 목록 */}
-            <DocumentListNew 
-              isAdmin={user?.role === 'admin'}
-              onVectorize={user?.role === 'admin' ? handleVectorizeDocument : handleRequestVectorize}
-              onDeleteVector={user?.role === 'admin' ? handleDeleteVector : handleRequestDeleteVector}
-              onEdit={handleEditDocument}
-              initialViewType="my"  // 내 문서만 보이도록 설정
-              initialStatusFilter=""  // 모든 상태의 문서 표시
-              forceUpdate={forceUpdate}
-              onSelectDocument={handleDocumentSelect}
-              selectedDocuments={selectedDocuments}
-            />
           </>
         )}
       </div>

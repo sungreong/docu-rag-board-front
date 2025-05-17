@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { documentService } from '../api';
 import TaskProgress from './TaskProgress';
 import FileUploadStatus from './FileUploadStatus';
-import { getSystemTags } from '../api/tags';
+import { tagsApi } from '../api/tags';
 
 function UploadForm({ onUploadSuccess }) {
   const [title, setTitle] = useState('');
@@ -28,22 +28,30 @@ function UploadForm({ onUploadSuccess }) {
   const [uploadedDocumentId, setUploadedDocumentId] = useState(null);
   const [isPublic, setIsPublic] = useState(true);
   const [suggestedTags, setSuggestedTags] = useState([]);
+  const [selectedTags, setSelectedTags] = useState([]);
   
   const fileInputRef = useRef(null);
   const tagInputRef = useRef(null);
 
-  // 시스템 태그 로드
+  // 사용 가능한 모든 태그 로드 (시스템 태그 + 개인 태그)
   useEffect(() => {
-    const loadSystemTags = async () => {
+    const loadAvailableTags = async () => {
       try {
-        const response = await getSystemTags();
-        setSuggestedTags(response.map(tag => tag.name));
+        const response = await tagsApi.getAvailableTags({
+          skip: 0,
+          limit: 100
+        });
+        setSuggestedTags(response.map(tag => ({
+          name: tag.name,
+          color: tag.color,
+          description: tag.description
+        })));
       } catch (error) {
-        console.error('시스템 태그 로드 실패:', error);
+        console.error('태그 로드 실패:', error);
       }
     };
     
-    loadSystemTags();
+    loadAvailableTags();
   }, []);
 
   // 파일 선택 핸들러
@@ -81,16 +89,16 @@ function UploadForm({ onUploadSuccess }) {
     }
   };
 
-  // 태그 클릭으로 추가
-  const handleSuggestedTagClick = (tag) => {
-    if (!tags.includes(tag)) {
-      setTags([...tags, tag]);
+  // 태그 선택 핸들러
+  const handleTagSelect = (tag) => {
+    if (!selectedTags.some(t => t.name === tag.name)) {
+      setSelectedTags([...selectedTags, tag]);
     }
   };
 
-  // 태그 삭제
-  const removeTag = (tagToRemove) => {
-    setTags(tags.filter(tag => tag !== tagToRemove));
+  // 태그 제거 핸들러
+  const handleTagRemove = (tagToRemove) => {
+    setSelectedTags(selectedTags.filter(tag => tag.name !== tagToRemove.name));
   };
 
   // 드래그 이벤트 핸들러
@@ -416,7 +424,7 @@ function UploadForm({ onUploadSuccess }) {
       formData.append('summary', summary);
       formData.append('startDate', startDate);
       formData.append('endDate', endDate);
-      formData.append('tags', JSON.stringify(tags));
+      formData.append('tags', JSON.stringify(selectedTags.map(tag => tag.name)));
       formData.append('is_public', isPublic.toString());
       
       // 파일 추가 - 일관된 이름으로 변경
@@ -585,67 +593,43 @@ function UploadForm({ onUploadSuccess }) {
               </p>
             </div>
             
-            {/* 태그 */}
-            <div>
-              <label htmlFor="tags" className="block text-sm font-medium text-gray-700 mb-1">
-                태그
+            {/* 태그 선택 영역 */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                태그 선택
               </label>
-              <div className="mb-2 flex flex-wrap gap-1">
-                {tags.map((tag, index) => (
-                  <span 
-                    key={index} 
-                    className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
+              <div className="flex flex-wrap gap-2 mb-2">
+                {selectedTags.map(tag => (
+                  <div
+                    key={tag.name}
+                    className="flex items-center gap-1 px-2 py-1 rounded-full text-sm"
+                    style={{ backgroundColor: tag.color, color: '#ffffff' }}
                   >
-                    {tag}
-                    <button 
-                      type="button" 
-                      onClick={() => removeTag(tag)}
-                      className="ml-1.5 text-blue-500 hover:text-blue-700 focus:outline-none"
+                    <span>{tag.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleTagRemove(tag)}
+                      className="hover:text-gray-200"
                     >
-                      <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
+                      ×
                     </button>
-                  </span>
+                  </div>
                 ))}
               </div>
-              
-              <div className="flex">
-                <input
-                  type="text"
-                  id="tagInput"
-                  ref={tagInputRef}
-                  value={tagInput}
-                  onChange={handleTagInputChange}
-                  onKeyDown={handleTagKeyDown}
-                  className="w-full p-2 border border-gray-300 rounded-l-md"
-                  placeholder="태그 입력 후 엔터 (쉼표로 구분)"
-                />
-                <button
-                  type="button"
-                  onClick={() => addTag(tagInput)}
-                  className="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-md text-gray-700 hover:bg-gray-200"
-                >
-                  추가
-                </button>
-              </div>
-              
-              {/* 추천 태그 */}
-              <div className="mt-2">
-                <p className="text-xs text-gray-500 mb-1">추천 태그:</p>
-                <div className="flex flex-wrap gap-1">
-                  {suggestedTags
-                    .filter(tag => !tags.includes(tag))
-                    .slice(0, 30)
-                    .map((tag, index) => (
-                      <button
-                        key={index}
-                        type="button"
-                        onClick={() => handleSuggestedTagClick(tag)}
-                        className="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-800 hover:bg-gray-200"
-                      >
-                        + {tag}
-                      </button>
+              <div className="border rounded-md p-2">
+                <div className="text-sm font-medium mb-2">추천 태그:</div>
+                <div className="flex flex-wrap gap-2">
+                  {suggestedTags.map(tag => (
+                    <button
+                      key={tag.name}
+                      type="button"
+                      onClick={() => handleTagSelect(tag)}
+                      className="px-2 py-1 rounded-full text-sm text-white"
+                      style={{ backgroundColor: tag.color }}
+                      title={tag.description || tag.name}
+                    >
+                      {tag.name}
+                    </button>
                   ))}
                 </div>
               </div>

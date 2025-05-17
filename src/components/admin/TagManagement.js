@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import * as tagApi from '../../api/tags';
+import { tagsApi } from '../../api/tags';
+
 
 const TagManagement = () => {
   const [systemTags, setSystemTags] = useState([]);
   const [userTags, setUserTags] = useState([]);
   const [newTagName, setNewTagName] = useState('');
   const [newTagDescription, setNewTagDescription] = useState('');
+  const [newTagColor, setNewTagColor] = useState('#3B82F6');
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('system'); // 'system' or 'user'
   const [editingTag, setEditingTag] = useState(null);
@@ -19,61 +21,66 @@ const TagManagement = () => {
   const loadTags = async () => {
     setIsLoading(true);
     try {
-      const [systemTagsData, userTagsData] = await Promise.all([
-        tagApi.getSystemTags(),
-        tagApi.getUserTags()
-      ]);
+      // 시스템 태그와 개인 태그 모두 로드
+      const systemTagsData = await tagsApi.getSystemTags();
+      const personalTagsData = await tagsApi.getPersonalTags();
       setSystemTags(systemTagsData);
-      setUserTags(userTagsData);
+      setUserTags(personalTagsData);
     } catch (error) {
       console.error('태그 로드 실패:', error);
+      alert('태그 목록을 불러오는데 실패했습니다.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 태그 생성
+  // 시스템 태그 생성
   const handleCreateTag = async (e) => {
     e.preventDefault();
     if (!newTagName.trim()) return;
 
     try {
-      await tagApi.createSystemTag({
+      await tagsApi.createSystemTag({
         name: newTagName.trim(),
-        description: newTagDescription.trim()
+        description: newTagDescription.trim(),
+        color: newTagColor
       });
       setNewTagName('');
       setNewTagDescription('');
-      loadTags(); // 태그 목록 새로고침
+      setNewTagColor('#3B82F6');
+      loadTags();
+      alert('시스템 태그가 생성되었습니다.');
     } catch (error) {
       console.error('태그 생성 오류:', error);
       alert('태그 생성 중 오류가 발생했습니다.');
     }
   };
 
-  // 태그 수정
+  // 시스템 태그 수정
   const handleUpdateTag = async (tag) => {
     try {
-      await tagApi.updateTag(tag.id, {
+      await tagsApi.updateSystemTag(tag.id, {
         name: tag.name,
         description: tag.description,
-        is_system: tag.is_system
+        color: tag.color
       });
       setEditingTag(null);
-      loadTags(); // 태그 목록 새로고침
+      loadTags();
+      alert('태그가 수정되었습니다.');
     } catch (error) {
       console.error('태그 수정 오류:', error);
       alert('태그 수정 중 오류가 발생했습니다.');
     }
   };
 
-  // 태그 삭제
+  // 시스템 태그 삭제
   const handleDeleteTag = async (tagId) => {
     if (!window.confirm('이 태그를 삭제하시겠습니까?')) return;
 
     try {
-      await tagApi.deleteTag(tagId);
-      loadTags(); // 태그 목록 새로고침
+      await tagsApi.deleteSystemTag(tagId);
+      loadTags();
+      alert('태그가 삭제되었습니다.');
     } catch (error) {
       console.error('태그 삭제 오류:', error);
       alert('태그 삭제 중 오류가 발생했습니다.');
@@ -133,7 +140,7 @@ const TagManagement = () => {
         {activeTab === 'system' && (
           <form onSubmit={handleCreateTag} className="mb-6 p-4 bg-gray-50 rounded-lg">
             <h3 className="text-lg font-medium mb-4">새 시스템 태그 생성</h3>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   태그 이름
@@ -156,6 +163,17 @@ const TagManagement = () => {
                   onChange={(e) => setNewTagDescription(e.target.value)}
                   className="w-full p-2 border border-gray-300 rounded-md"
                   placeholder="태그 설명 입력"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  색상
+                </label>
+                <input
+                  type="color"
+                  value={newTagColor}
+                  onChange={(e) => setNewTagColor(e.target.value)}
+                  className="w-full h-10 p-1 border border-gray-300 rounded-md"
                 />
               </div>
             </div>
@@ -181,6 +199,9 @@ const TagManagement = () => {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     설명
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    색상
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     생성일
@@ -217,6 +238,21 @@ const TagManagement = () => {
                         />
                       ) : (
                         <div className="text-sm text-gray-500">{tag.description}</div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      {editingTag?.id === tag.id ? (
+                        <input
+                          type="color"
+                          value={editingTag.color || '#3B82F6'}
+                          onChange={(e) => setEditingTag({...editingTag, color: e.target.value})}
+                          className="w-20 h-8 p-1 border border-gray-300 rounded-md"
+                        />
+                      ) : (
+                        <div 
+                          className="w-6 h-6 rounded-full"
+                          style={{ backgroundColor: tag.color || '#3B82F6' }}
+                        />
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
